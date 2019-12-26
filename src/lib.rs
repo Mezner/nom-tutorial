@@ -42,6 +42,17 @@ pub(self) mod parsers {
         nom::bytes::complete::escaped_transform(nom::bytes::complete::is_not("\\"), '\\', nom::branch::alt((escaped_backslash, escaped_space)))(i)
     }
 
+    fn mount_opts(i: &str) -> nom::IResult<&str, Vec<String>> {
+        nom::multi::separated_list(
+            nom::character::complete::char(','),
+            nom::combinator::map_parser(
+                nom::bytes::complete::is_not(", \t"),
+                transform_escaped
+            )
+        )(i)
+    }
+
+    #[cfg(test)]
     mod tests {
         use super::*;
 
@@ -62,6 +73,11 @@ pub(self) mod parsers {
         fn test_transform_escaped() {
             assert_eq!(transform_escaped("\\bad"), Err(nom::Err::Error(("bad", nom::error::ErrorKind::Tag))));
             assert_eq!(transform_escaped("abc\\040def\\\\g\\040h"), Ok(("", String::from("abc def\\g h"))));
+        }
+
+        #[test]
+        fn test_mount_opts() {
+            assert_eq!(mount_opts("a,bc,d\\040e"), Ok(("", vec!["a".to_string(), "bc".to_string(), "d e".to_string()])));
         }
     }
 }
