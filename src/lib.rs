@@ -1,3 +1,7 @@
+use std::path::PathBuf;
+use std::io::BufRead;
+use std::io::Read;
+
 #[derive(Default)]
 pub struct ParseError;
 
@@ -21,6 +25,21 @@ pub struct Mount {
     pub mount_point: String,
     pub file_system_type: String,
     pub options: Vec<String>,
+}
+
+pub fn mounts(path: &PathBuf) -> Result<Vec<Mount>, std::boxed::Box<dyn std::error::Error>> {
+    let file = std::fs::File::open(path)?;
+    let reader = std::io::BufReader::new(file);
+    let mut mounts = Vec::new();
+    for line in reader.lines() {
+        match parsers::parse_line(&line?) {
+            Ok((_, m)) => {
+                mounts.push(m);
+            }
+            Err(_) => return Err(ParseError::default().into())
+        }
+    }
+    Ok(mounts)
 }
 
 pub(self) mod parsers {
