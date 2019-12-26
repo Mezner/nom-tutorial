@@ -30,6 +30,18 @@ pub(self) mod parsers {
         nom::bytes::complete::is_not(" \t")(i)
     }
 
+    fn escaped_space(i: &str) -> nom::IResult<&str, &str> {
+        nom::combinator::value(" ", nom::bytes::complete::tag("040"))(i)
+    }
+
+    fn escaped_backslash(i: &str) -> nom::IResult<&str, &str> {
+        nom::combinator::recognize(nom::character::complete::char('\\'))(i)
+    }
+
+    fn transform_escaped(i: &str) -> nom::IResult<&str, String> {
+        nom::bytes::complete::escaped_transform(nom::bytes::complete::is_not("\\"), '\\', nom::branch::alt((escaped_backslash, escaped_space)))(i)
+    }
+
     mod tests {
         use super::*;
 
@@ -38,6 +50,18 @@ pub(self) mod parsers {
             assert_eq!(not_whitespace("abcd efg"), Ok((" efg", "abcd")));
             assert_eq!(not_whitespace("abcd\tefg"), Ok(("\tefg", "abcd")));
             assert_eq!(not_whitespace(" abcdefg"), Err(nom::Err::Error((" abcdefg", nom::error::ErrorKind::IsNot))));
+        }
+
+        #[test]
+        fn test_escaped_backslash() {
+            assert_eq!(escaped_backslash("\\"), Ok(("", "\\")));
+            assert_eq!(escaped_backslash("not a backslash"), Err(nom::Err::Error(("not a backslash", nom::error::ErrorKind::Char))));
+        }
+
+        #[test]
+        fn test_transform_escaped() {
+            assert_eq!(transform_escaped("\\bad"), Err(nom::Err::Error(("bad", nom::error::ErrorKind::Tag))));
+            assert_eq!(transform_escaped("abc\\040def\\\\g\\040h"), Ok(("", String::from("abc def\\g h"))));
         }
     }
 }
