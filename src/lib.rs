@@ -52,6 +52,46 @@ pub(self) mod parsers {
         )(i)
     }
 
+    pub fn parse_line(i: &str) -> nom::IResult<&str, Mount> {
+        match nom::combinator::all_consuming(nom::sequence::tuple((
+            nom::combinator::map_parser(not_whitespace, transform_escaped),
+            nom::character::complete::space1,
+            nom::combinator::map_parser(not_whitespace, transform_escaped),
+            nom::character::complete::space1,
+            not_whitespace, // file_system_type
+            nom::character::complete::space1,
+            mount_opts, // options
+            nom::character::complete::space1,
+            nom::character::complete::char('0'),
+            nom::character::complete::space1,
+            nom::character::complete::char('0'),
+            nom::character::complete::space0,
+        )))(i) {
+            Ok((remaining_input, (
+                device,
+                _,
+                mount_point,
+                _,
+                file_system_type,
+                _,
+                options,
+                _,
+                _,
+                _,
+                _,
+                _,
+            ))) => {
+                Ok((remaining_input, Mount {
+                    device,
+                    mount_point,
+                    file_system_type: file_system_type.to_string(),
+                    options
+                }))
+            },
+            Err(e) => Err(e)
+        }
+    }
+
     #[cfg(test)]
     mod tests {
         use super::*;
@@ -78,6 +118,21 @@ pub(self) mod parsers {
         #[test]
         fn test_mount_opts() {
             assert_eq!(mount_opts("a,bc,d\\040e"), Ok(("", vec!["a".to_string(), "bc".to_string(), "d e".to_string()])));
+        }
+
+        #[test]
+        fn test_parse_line() {
+            let mount = Mount{
+                device: "device".to_string(),
+                mount_point: "mount_point".to_string(),
+                file_system_type: "file_system_type".to_string(),
+                options: vec!["options".to_string(), "a".to_string(), "b=c".to_string(), "d e".to_string()]
+            };
+            let (_, expected) = parse_line("device mount_point file_system_type options,a,b=c,d\\040e 0 0").unwrap();
+            assert_eq!(mount.device, expected.device);
+            assert_eq!(mount.mount_point, expected.mount_point);
+            assert_eq!(mount.file_system_type, expected.file_system_type);
+            assert_eq!(mount.options, expected.options);
         }
     }
 }
